@@ -1,0 +1,191 @@
+graph TD
+
+  %% =========================
+  %% Clients / Surfaces
+  %% =========================
+  subgraph Clients["Clients / Surfaces"]
+    SearchUI["Search UI (web/app)"]
+    HomeFeed["Home / Feed"]
+    PDP["PDP & Cart"]
+    Sparky["Sparky (Walmart assistant)"]
+    ChatGPT["ChatGPT / Partner Agents"]
+  end
+
+  %% =========================
+  %% API & Tools Layer
+  %% =========================
+  subgraph API["API Layer & LLM Tools"]
+    SearchAPI["SearchProducts API"]
+    RecsAPI["GetRecommendations API"]
+    ModulesAPI["GetPageModules API"]
+    ToolsAPI["LLM Tools (Sparky / ChatGPT)"]
+  end
+
+  %% =========================
+  %% Inference Orchestrator
+  %% =========================
+  subgraph Orchestrator["Inference Graph Orchestrator / Relevance Runtime"]
+    OrchestratorCore["Graph Execution Engine"]
+    LLMComplexityClassifier["Fast LLM Complexity Classifier\n(Fast vs Slow Path)"]
+  end
+
+  %% =========================
+  %% Online State & Features
+  %% =========================
+  subgraph OnlineState["Identity, Session & Features"]
+    IdentitySvc["Identity Service\n(user_id, session_id, household)"]
+    SessionStore["Session / Journey Store"]
+    FeatureStore["Unified Feature Store\n(online + offline views)"]
+    EmbeddingSvc["Embedding Services\n(user, item, query, context)"]
+  end
+
+  %% =========================
+  %% Retrieval Layer
+  %% =========================
+  subgraph RetrievalLayer["Unified Retrieval Layer"]
+    RetrievalService["Unified Retrieval Service\n(lexical + ANN + hybrid)"]
+    subgraph Indexes["Indexes"]
+      ProductIndex["Product / Content Index"]
+      KnowledgeIndex["Knowledge / FAQ / Docs Index"]
+    end
+  end
+
+  %% =========================
+  %% Ranking & Arbitration
+  %% =========================
+  subgraph RankingArb["Ranking & Module / Slate Arbitration"]
+    SearchRanker["Search Ranker"]
+    P13NRanker["P13N Ranker"]
+    SlateArbitration["Slate / Page Arbitration Engine"]
+    PolicyEngine["Policy & Bandit Engine\n(explore/exploit, module selection)"]
+    CacheLayer["Caching Layer\n(base SERP, features, results)"]
+  end
+
+  %% =========================
+  %% Models & Serving
+  %% =========================
+  subgraph Models["Shared Models & Serving"]
+    SharedContextModel["Shared Context / Representation Model\n(Search + P13N trunk)"]
+    ModelServing["Online Model Serving\n(TF/ONNX/Torch, etc.)"]
+  end
+
+  %% =========================
+  %% Events, Data, Training
+  %% =========================
+  subgraph DataPlane["Events, Offline Data & Training"]
+    EventBus["Unified Event Bus\n(clicks, views, orders, chat)"]
+    DataLake["Data Lake / Warehouse"]
+    TrainingPipelines["Training Pipelines\n(batch + streaming)"]
+    Experimentation["Experimentation Platform\n(A/B, replay, bandits eval)"]
+  end
+
+  %% =========================
+  %% Governance & Monitoring
+  %% =========================
+  subgraph Governance["Monitoring, Safety & Governance"]
+    MetricsDash["Metrics & Observability\n(latency, errors, KPIs)"]
+    Guardrails["Guardrails & Safety\n(policy, eligibility, compliance)"]
+  end
+
+  %% =========================
+  %% Client -> API
+  %% =========================
+  SearchUI --> SearchAPI
+  SearchUI --> RecsAPI
+  HomeFeed --> RecsAPI
+  PDP --> RecsAPI
+  PDP --> ModulesAPI
+  Sparky --> ToolsAPI
+  ChatGPT --> ToolsAPI
+
+  %% =========================
+  %% API -> Orchestrator
+  %% =========================
+  SearchAPI --> OrchestratorCore
+  RecsAPI --> OrchestratorCore
+  ModulesAPI --> OrchestratorCore
+  ToolsAPI --> OrchestratorCore
+
+  %% Complexity classifier inside orchestrator
+  OrchestratorCore --> LLMComplexityClassifier
+  LLMComplexityClassifier --> OrchestratorCore
+
+  %% =========================
+  %% Orchestrator -> Online State & Features
+  %% =========================
+  OrchestratorCore --> IdentitySvc
+  OrchestratorCore --> SessionStore
+  OrchestratorCore --> FeatureStore
+  OrchestratorCore --> EmbeddingSvc
+
+  IdentitySvc --> SessionStore
+  EventBus --> SessionStore
+  EventBus --> FeatureStore
+
+  %% =========================
+  %% Orchestrator -> Retrieval & Ranking
+  %% =========================
+  OrchestratorCore --> RetrievalService
+  OrchestratorCore --> SearchRanker
+  OrchestratorCore --> P13NRanker
+  OrchestratorCore --> SlateArbitration
+  OrchestratorCore --> PolicyEngine
+  OrchestratorCore --> CacheLayer
+
+  %% Retrieval -> Indexes
+  RetrievalService --> ProductIndex
+  RetrievalService --> KnowledgeIndex
+
+  %% Rankers -> Arbitration
+  SearchRanker --> SlateArbitration
+  P13NRanker --> SlateArbitration
+  PolicyEngine --> SlateArbitration
+
+  %% Cache interactions
+  OrchestratorCore --> CacheLayer
+  CacheLayer --> OrchestratorCore
+
+  %% =========================
+  %% Models & Serving Wiring
+  %% =========================
+  FeatureStore --> SharedContextModel
+  SessionStore --> SharedContextModel
+  DataLake --> TrainingPipelines
+  TrainingPipelines --> SharedContextModel
+  TrainingPipelines --> ModelServing
+
+  SharedContextModel --> EmbeddingSvc
+  SharedContextModel --> ModelServing
+
+  ModelServing --> SearchRanker
+  ModelServing --> P13NRanker
+  ModelServing --> RetrievalService
+
+  %% =========================
+  %% Events, Experiments, Policies
+  %% =========================
+  OrchestratorCore --> EventBus
+  SlateArbitration --> EventBus
+  PolicyEngine --> EventBus
+
+  EventBus --> DataLake
+  EventBus --> Experimentation
+  Experimentation --> PolicyEngine
+
+  %% =========================
+  %% Governance & Monitoring
+  %% =========================
+  OrchestratorCore --> MetricsDash
+  RetrievalService --> MetricsDash
+  SearchRanker --> MetricsDash
+  P13NRanker --> MetricsDash
+  SlateArbitration --> MetricsDash
+  EventBus --> MetricsDash
+  ModelServing --> MetricsDash
+
+  Guardrails --> OrchestratorCore
+  Guardrails --> SearchAPI
+  Guardrails --> RecsAPI
+  Guardrails --> ModulesAPI
+  Guardrails --> ToolsAPI
+
